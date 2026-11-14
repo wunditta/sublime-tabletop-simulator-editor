@@ -126,7 +126,7 @@ Set the settings for a project in the project specific settings (Project > Edit 
 
 ### Example for Project Settings
 
-```JSON
+```json
 {
     "folders":
     [
