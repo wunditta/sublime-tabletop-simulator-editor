@@ -31,27 +31,26 @@ deleted and the object pushed).
 ## Commands
 
 ### Find Commands
-* Tools > Tabletop Simulator
-* Tools > Build (Ctrl+B)
-* Command Palette (Ctrl+Shift+P) > Tabletop Simulator: ...
-
-### Commands List
-* **Get Lua Scripts** (Ctrl+Alt+G): TTS sends the scripts of every object in the loaded save (note: scripts of
-    objects, which do not exist in the TTS world (e.g. inside container, bags, decks), are not provided by TTS); the
-    files are written to the script folder and Global.-1.lua is opened. Files of objects that no longer exist are not
-    deleted.
-* **Save & Play** (Ctrl+Alt+S, Ctrl+B): Sends script files to TTS via the Safe & Play function, which only saves the
-    scripts and UI, and restores the game to its saved state with the new scripts. Only scripts currently open in
-    Sublime are pushed to TTS (also see setting "push"). However, TTS requires to push the Lua and UI XML for an
-    object, otherwise the not sent part becomes empty. Therefore, always both files are pushed, regardless which
-    one (or both) you have open.
-* **Save & Play (all scripts)**: Like above but pushes all scripts to TTS (note: pushing a script for an object, which
-    does not exist in the 3D world, is silently ignored by TTS).
-* **Execute Selection in Global** (Ctrl+Alt+E): Runs the selection (or the whole file) as Lua in Global. Output with
-    `print` and errors show in the TTS output panel.
-* **Show TTS Output**: the panel with print output, Lua errors and status lines. With `"show_panel_on_output": false`
-    the panel stays in the background and Lua errors reported by TTS come up in a dialog instead.
-* **Start / Stop Listener**: Start or stop the listener by hand, see below.
+* **Tools > Tabletop Simulator >**
+    * **Get Lua Scripts** (Ctrl+Alt+G): TTS sends the scripts of every object in the loaded save (note: scripts of
+        objects, which do not exist in the TTS world (e.g. inside container, bags, decks), are not provided by TTS); the
+        files are written to the script folder and Global.-1.lua is opened. Files of objects that no longer exist are not
+        deleted.
+    * **Save & Play** (Ctrl+Alt+S): Sends script files to TTS via the Safe & Play function, which only saves the
+        scripts and UI, and restores the game to its saved state with the new scripts. Only scripts currently open in
+        Sublime are pushed to TTS. However, TTS requires to push the Lua and UI XML for an
+        object, otherwise the not sent part becomes empty. Therefore, always both files are pushed, regardless which
+        one (or both) you have open.
+    * **Save & Play (all scripts)**: Like above but pushes all scripts to TTS (note: pushing a script for an object, which
+        does not exist in the 3D world, is silently ignored by TTS).
+    * **Save Used Files on Build**: A checkbox to for Save & Play to save all unsaved files, which are needed to push, automatically.
+    * **Execute Selection in Global** (Ctrl+Alt+E): Runs the selection (or the whole file) as Lua in Global. Output with
+        `print` and errors show in the TTS output panel.
+    * **Show TTS Output**: the panel with print output, Lua errors and status lines. With `"show_panel_on_output": false`
+        the panel stays in the background and Lua errors reported by TTS come up in a dialog instead.
+    * **Start / Stop Listener**: Start or stop the listener by hand, see below.
+* **Tools > Build** (Ctrl+B): The build system only uses Sublime's own "Save All on Build", which saves **all** open files, even if not pushed at all and also pushes all scripts. Otherwise it behaves like "Save & Play (all scripts)".
+* **Command Palette** (Ctrl+Shift+P) > "Tabletop Simulator: ..."
 
 ## Save ID
 
@@ -137,11 +136,34 @@ Set the settings for a project in the project specific settings (Project > Edit 
     {
         "tts_editor":
         {
+            // Local folder for the downloaded TTS scripts. Defaults to the folder above (folders.path)
+            "script_folder": "",
+            // Subfolder of script_folder holding the object scripts. Empty = same as script_folder.
+            "objects_subfolder": "",
+            // Listener: The following values are possible:
+            //   "on_demand": runs only when needed for Get, Save & Play and Execute and exits after listener_grace_seconds
+            //   "first_use": starts with first communication with TTS or manual start and then runs until Sublime Text closes
+            //   "always":    runs while Sublime Text is open (print output while playing; blocks the port for other TTS tools)
             "listener": "always",
+            // Keep the replaced state in <script folder>/_history/<yyyy-mm-dd hh-mm-ss>/: before a push the scripts TTS runs
+            // now are fetched and saved there, before a Get the project's current script files are saved there.
+            "history": true,
+            // Number of history folders kept: the oldest beyond this number are deleted at the next push; null = keep everything
+            "history_keep": 100,
         }
     }
 }
 ```
+
+## Installation
+
+Via [Package Control](https://packagecontrol.io): `Package Control: Install Package` > `Tabletop Simulator Editor`.
+By hand: copy this repository into a folder `Tabletop Simulator Editor` inside Sublime's `Packages` folder
+(Preferences > Browse Packages...).
+
+## License
+
+GNU General Public License v3.0 or later - see LICENSE. Issues and suggestions: https://github.com/wunditta/tabletop-simulator-editor/issues
 
 ## API
 
@@ -201,13 +223,3 @@ What a program (or an AI assistant with file access) needs to know to drive TTS 
 6. Failure signs: `ERR` lines (TTS not reachable, port taken), `LUAERR` lines after a push (the pushed script has an
    error), `WARN push result` (an object file whose object is not in the scene, or a script TTS runs differently),
    a command file that is not deleted (see 3).
-
-## Installation
-
-Via [Package Control](https://packagecontrol.io): `Package Control: Install Package` > `Tabletop Simulator Editor`.
-By hand: copy this repository into a folder `Tabletop Simulator Editor` inside Sublime's `Packages` folder
-(Preferences > Browse Packages...).
-
-## License
-
-GNU General Public License v3.0 or later - see LICENSE. Issues and suggestions: https://github.com/wunditta/tabletop-simulator-editor/issues

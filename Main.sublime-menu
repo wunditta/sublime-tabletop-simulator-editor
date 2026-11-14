@@ -22,10 +22,21 @@
                         }
                     },
                     {
+                        "caption": "Save & Play This File",
+                        "command": "tts_save_and_play",
+                        "args": {
+                            "mode": "current"
+                        }
+                    },
+                    {
+                        "caption": "Save Used Files on Build",
+                        "command": "tts_toggle_save_used",
+                        "checkbox": true
+                    },
+                    {
                         "caption": "-"
                     },
                     {
-                        "caption": "Execute Selection in Global",
                         "command": "tts_execute"
                     },
                     {
@@ -75,7 +86,7 @@
                                 "caption": "Key Bindings",
                                 "command": "edit_settings",
                                 "args": {
-                                    "base_file": "${packages}/Tabletop Simulator Editor/Default ($platform).sublime-keymap",
+                                    "base_file": "${packages}/Tabletop Simulator Editor/Default.sublime-keymap",
                                     "default": "[\n\t$0\n]\n"
                                 }
                             },

@@ -10,7 +10,7 @@
     // A relative path is taken from the folder holding the project file.
     "script_folder": "",
 
-    // Subfolder of script_folder holding the object scripts. Empty = together with Global.
+    // Subfolder of script_folder holding the object scripts. Empty = same as script_folder.
     // Other subfolders of the script folder are ignored for pushing to TTS.
     "objects_subfolder": "",
 
@@ -18,7 +18,7 @@
     // It receives what TTS sends on port 39998: scripts (Get), print output, Lua errors.
     // The following values are possible:
     //   "on_demand": runs only when needed for Get, Save & Play and Execute and exits after listener_grace_seconds
-    //   "first_use": starts with the first Get, Save & Play, Execute or manual start and then runs until Sublime Text closes
+    //   "first_use": starts with first communication with TTS or manual start and then runs until Sublime Text closes
     //   "always":    runs while Sublime Text is open (print output while playing; blocks the port for other TTS tools)
     "listener": "on_demand",
     // For "on_demand" the time the listener runs on after a push or Execute (to get error messages and show them in
@@ -39,13 +39,11 @@
     // Note: An ID line is looked up first at the specified position, but found anywhere in the file (and left as is).
     "save_id": true,
 
-    // What Save & Play pushes:
-    //   "open":   the open script files of the project window (Global.-1.lua, Global.-1.xml, <Name>.<GUID>.lua)
-    //   "folder": all script files of the script folder (also files of objects currently not in the scene - TTS ignores those)
-    // Note: TTS requires to push the corresponding Lua script and the UI XML at the same time (otherwise it would be removed in TTS).
-    "push": "open",
-    // If true all pushed files are automatically saved before, otherwise a confirmation dialog comes up
-    "save_before_push": false,
+    // Save & Play from the package's menu, key bindings or command palette: if true the pushed ("used") files are saved
+    // automatically before the push, otherwise a confirmation dialog comes up. Also a checkbox in the menu
+    // ("Save Used Files on Build"). Tools > Build (Ctrl+B) pushes all scripts and follows Sublime's own
+    // "Save All on Build" instead.
+    "save_used_on_build": false,
     // After a push TTS reloads and reports the scripts it now runs; they are compared with what was sent. If true a
     // dialog reports scripts TTS did not take (their objects are not loose in the scene) or runs differently;
     // the result always goes to the TTS output panel. "Don't show again" in that dialog sets this to false.

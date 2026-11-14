@@ -1,0 +1,5 @@
+[
+    { "caption": "-", "id": "tts-editor-side-bar" },
+    { "command": "tts_save_and_play", "args": {"files": []} },
+    { "command": "tts_save_and_play", "args": {"dirs": []} }
+]

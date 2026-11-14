@@ -49,10 +49,9 @@ DEFAULTS = {
     "script_folder": "",
     "objects_subfolder": "",
     "listener": "on_demand",
-    "save_before_push": False,
+    "save_used_on_build": False,
     "report_push_result": True,
     "listener_grace_seconds": 30,
-    "push": "open",
     "save_id": True,
     "history": False,
     "history_keep": None,
@@ -540,8 +539,8 @@ def is_script_file(window, path):
     return False
 
 
-def folder_script_files(window):
-    base = script_folder(window)
+def folder_script_files(window, base=None):
+    base = base or script_folder(window)
     files = []
     for fn in (GLOBAL_LUA, GLOBAL_XML):
         if os.path.isfile(os.path.join(base, fn)):
@@ -570,10 +569,10 @@ def with_partners(files):
     return out
 
 
-def build_states(window, files):
+def build_states(window, files, base=None):
     """Script states for the files. Script and UI of an object (Global included) always travel together - TTS clears
     the part that is not sent - so for each file the partner is read from disk; no .xml file means no UI."""
-    base = script_folder(window)
+    base = base or script_folder(window)
     states, done = [], set()
     for path in files:
         fn = os.path.basename(path)
@@ -888,31 +887,58 @@ class TtsGetScriptsCommand(sublime_plugin.WindowCommand):
             expect_answer(-1)
 
 
-class TtsSaveAndPlayCommand(sublime_plugin.WindowCommand):
-    """Push the script files (open ones, or the whole folder) to TTS, which reloads the save with them."""
+def folder_has_scripts(path):
+    return bool(path) and os.path.isfile(os.path.join(path, GLOBAL_LUA))
 
-    def run(self, mode=None, **kwargs):   # kwargs: whatever a build system passes along
+
+class TtsSaveAndPlayCommand(sublime_plugin.WindowCommand):
+    """Push script files to TTS, which reloads the save with them.
+    mode "open" (default): the open script files; "folder": every script file of the script folder; "current": the
+    active file. From the side bar: files=[...] pushes those files, dirs=[...] pushes a folder (the script folder, or -
+    after a confirmation - any other folder holding a Global.-1.lua, e.g. a history snapshot)."""
+
+    def run(self, mode=None, files=None, dirs=None, **kwargs):   # kwargs: whatever a build system passes along
         w = self.window
         base = script_folder(w)
-        if not base or not os.path.isfile(os.path.join(base, GLOBAL_LUA)):
+        if dirs:
+            base = os.path.normpath(dirs[0])
+            if not folder_has_scripts(base):
+                return sublime.error_message("Tabletop Simulator Editor: no %s in \"%s\"" % (GLOBAL_LUA, base))
+            if os.path.normcase(base) != os.path.normcase(script_folder(w) or ""):
+                if not sublime.ok_cancel_dialog("\"%s\" is not the script folder of this project.\n\nPush its scripts to TTS anyway "
+                                                "(the loaded save is replaced by them)?" % base, "Push"):
+                    return
+            mode = "folder"
+        if not folder_has_scripts(base):
             sublime.error_message("Tabletop Simulator Editor: no %s in \"%s\" - open a project with the script folder or set \"script_folder\"" % (GLOBAL_LUA, base))
             return
-        mode = mode or setting(w, "push")
-        if mode == "open":
-            views = [v for v in w.views() if is_script_file(w, v.file_name())]
-            dirty = [v for v in views if v.is_dirty()]
-            if dirty and not setting(w, "save_before_push"):
-                if not sublime.ok_cancel_dialog("%d script file(s) are not saved:\n\n%s\n\nSave them and push?" % (len(dirty), "\n".join(os.path.basename(v.file_name()) for v in dirty)), "Save and push"):
-                    return
-                for v in dirty:
-                    v.run_command("save")
-            files = with_partners(sorted(set(v.file_name() for v in views)))
+        mode = mode or "open"
+        if files:
+            files = with_partners([f for f in files if is_script_file(w, f)])
             if not files:
-                log("WARN", "no script files are open - nothing to push (open %s or an object script, or set \"push\": \"folder\")" % GLOBAL_LUA)
+                return sublime.error_message("Tabletop Simulator Editor: none of the selected files is a script file of this project")
+        elif mode == "current":
+            v = w.active_view()
+            fn = v.file_name() if v else None
+            if not is_script_file(w, fn):
+                return sublime.error_message("Tabletop Simulator Editor: the current file is not a script file of this project")
+            files = with_partners([fn])
+        elif mode == "open":
+            files = with_partners(sorted(set(v.file_name() for v in w.views() if is_script_file(w, v.file_name()))))
+            if not files:
+                log("WARN", "no script files are open - nothing to push (open %s or an object script, or use Save & Play (all scripts))" % GLOBAL_LUA)
                 return
         else:
-            w.run_command("save_all")
-            files = folder_script_files(w)
+            files = folder_script_files(w, base)
+        # unsaved files among the used ones: save them (Save Used Files on Build) or ask
+        wanted = set(os.path.normcase(f) for f in files)
+        dirty = [v for v in w.views() if v.is_dirty() and v.file_name() and os.path.normcase(v.file_name()) in wanted]
+        if dirty:
+            if not setting(w, "save_used_on_build"):
+                if not sublime.ok_cancel_dialog("%d script file(s) are not saved:\n\n%s\n\nSave them and push?" % (len(dirty), "\n".join(os.path.basename(v.file_name()) for v in dirty)), "Save and push"):
+                    return
+            for v in dirty:
+                v.run_command("save")
         self.files = files
         self.base = base
         self.global_path = os.path.join(base, GLOBAL_LUA)
@@ -972,9 +998,34 @@ class TtsSaveAndPlayCommand(sublime_plugin.WindowCommand):
         else:
             log("INFO", "push cancelled - no backup of the scripts TTS runs")
 
+    def is_enabled(self, mode=None, files=None, dirs=None, **kwargs):
+        if mode == "current":
+            v = self.window.active_view()
+            return bool(v) and is_script_file(self.window, v.file_name())
+        return True
+
+    # side bar: Sublime fills "files": [] / "dirs": [] with the clicked items - an EMPTY list on the other kind of item
+    def is_visible(self, mode=None, files=None, dirs=None, context=False, **kwargs):
+        """side bar / context menu entries (context=true) are shown only where they apply; menu bar entries always"""
+        if files is not None:
+            return bool(files) and any(is_script_file(self.window, f) for f in files)
+        if dirs is not None:
+            return bool(dirs) and any(folder_has_scripts(d) for d in dirs)
+        if context and mode == "current":
+            return self.is_enabled(mode)
+        return True
+
+    def description(self, mode=None, files=None, dirs=None, context=False, **kwargs):
+        # right-click menus carry the "TTS" hint; the menu bar entries sit in the Tabletop Simulator submenu already
+        if dirs is not None:
+            return "TTS Save & Play All Scripts"
+        if files is not None or context:
+            return "TTS Save & Play"
+        return {"current": "Save & Play This File", "folder": "Save & Play (all scripts)"}.get(mode, "Save & Play")
+
     def push(self):
         w = self.window
-        states = build_states(w, self.files)
+        states = build_states(w, self.files, self.base)
         if not states:
             log("WARN", "nothing to push")
             return
@@ -989,7 +1040,11 @@ class TtsSaveAndPlayCommand(sublime_plugin.WindowCommand):
 class TtsExecuteCommand(sublime_plugin.TextCommand):
     """Run the selection (or the whole file) as Lua in Global; print() and the return value show in the panel."""
 
-    def run(self, edit):
+    def description(self, context=False, **kwargs):
+        what = "Selection" if any(not r.empty() for r in self.view.sel()) else "File"
+        return "Execute %s in TTS" % what if context else "Execute %s in Global" % what
+
+    def run(self, edit, context=False):
         parts = [self.view.substr(r) for r in self.view.sel() if not r.empty()]
         code = "\n".join(parts) if parts else self.view.substr(sublime.Region(0, self.view.size()))
         if not code.strip():
@@ -1005,6 +1060,28 @@ class TtsShowPanelCommand(sublime_plugin.WindowCommand):
         if self.window.find_output_panel(PANEL) is None:
             self.window.create_output_panel(PANEL)
         self.window.run_command("show_panel", {"panel": "output." + PANEL})
+
+
+class TtsToggleSaveUsedCommand(sublime_plugin.WindowCommand):
+    """Menu checkbox "Save Used Files on Build": flips save_used_on_build - in the project file when it is set there,
+    else in the package's user settings."""
+
+    def run(self):
+        w = self.window
+        new = not setting(w, "save_used_on_build")
+        pd = w.project_data() or {}
+        proj = (pd.get("settings") or {}).get("tts_editor")
+        if proj is not None and "save_used_on_build" in proj:
+            proj["save_used_on_build"] = new
+            w.set_project_data(pd)
+        else:
+            s = sublime.load_settings(SETTINGS_FILE)
+            s.set("save_used_on_build", new)
+            sublime.save_settings(SETTINGS_FILE)
+        sublime.status_message("TTS: Save Used Files on Build %s" % ("on" if new else "off"))
+
+    def is_checked(self):
+        return bool(setting(self.window, "save_used_on_build"))
 
 
 class TtsListenerCommand(sublime_plugin.WindowCommand):

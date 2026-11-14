@@ -1,0 +1,5 @@
+[
+    { "caption": "-", "id": "tts-editor-context" },
+    { "command": "tts_execute", "args": {"context": true} },
+    { "command": "tts_save_and_play", "args": {"mode": "current", "context": true} }
+]
